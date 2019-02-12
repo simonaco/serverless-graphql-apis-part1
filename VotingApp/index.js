@@ -1,16 +1,37 @@
-module.exports = async function (context, req) {
-    context.log('JavaScript HTTP trigger function processed a request.');
+const { graphql, buildSchema } = require('graphql');
+const axios = require('axios');
+const schema = buildSchema(`
+  type Team {
+    id: ID
+    name: String
+    points: Int
+  }
+  type Query {
+    teams: [Team]
+  }
+  type Mutation {
+    incrementPoints(id:ID!):Team  
+  }
+`);
 
-    if (req.query.name || (req.body && req.body.name)) {
-        context.res = {
-            // status: 200, /* Defaults to 200 */
-            body: "Hello " + (req.query.name || req.body.name)
-        };
-    }
-    else {
-        context.res = {
-            status: 400,
-            body: "Please pass a name on the query string or in the request body"
-        };
-    }
+const resolver = {
+  teams: (obj, args, context) => {
+    return axios
+      .get('https://graphqlvoting.azurewebsites.net/api/score')
+      .then(res => res.data);
+  },
+  incrementPointsobj: (obj, args, context) => {
+    return axios
+      .get(`https://graphqlvoting.azurewebsites.net/api/score/${obj.id}`)
+      .then(res => res.data);
+  }
+};
+module.exports = async function(context, req) {
+  const body = req.body;
+  context.log(`GraphQL request: ${body}`);
+
+  const response = await graphql(schema, body, resolver);
+  context.res = {
+    body: response
+  };
 };
